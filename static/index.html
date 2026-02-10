@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Facebook 自動發文排程</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 0 auto; padding: 1.5rem; }
+    h1 { font-size: 1.25rem; margin-bottom: 1rem; }
+    label { display: block; margin-top: 0.75rem; font-weight: 500; }
+    input, textarea { width: 100%; padding: 0.5rem; margin-top: 0.25rem; }
+    textarea { min-height: 80px; resize: vertical; }
+    button { margin-top: 1rem; padding: 0.5rem 1rem; cursor: pointer; }
+    .filters { margin: 1rem 0; }
+    .filters button { margin-right: 0.5rem; margin-top: 0; }
+    .filters button.active { background: #333; color: #fff; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #eee; }
+    .status-pending { color: #b8860b; }
+    .status-sent { color: #228b22; }
+    .status-failed { color: #c00; }
+    .msg { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .error { color: #c00; margin-top: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>Facebook 自動發文排程</h1>
+
+  <section>
+    <h2>新增排程</h2>
+    <form id="form">
+      <label>貼文內容 <span class="error" id="msgErr"></span></label>
+      <textarea id="message" name="message" required></textarea>
+      <label>排程時間</label>
+      <input type="datetime-local" id="scheduled_time" name="scheduled_time" required />
+      <label>附加連結（選填）</label>
+      <input type="url" id="link" name="link" placeholder="https://" />
+      <button type="submit">新增排程</button>
+    </form>
+  </section>
+
+  <section>
+    <h2>排程列表</h2>
+    <div class="filters">
+      <button type="button" data-filter="">全部</button>
+      <button type="button" data-filter="pending">待發送</button>
+      <button type="button" data-filter="sent">已發送</button>
+      <button type="button" data-filter="failed">失敗</button>
+    </div>
+    <table>
+      <thead>
+        <tr><th>ID</th><th>狀態</th><th>排程時間</th><th>貼文內容</th><th>操作</th></tr>
+      </thead>
+      <tbody id="list"></tbody>
+    </table>
+  </section>
+
+  <script>
+    const form = document.getElementById('form');
+    const listEl = document.getElementById('list');
+    const msgErr = document.getElementById('msgErr');
+    let currentFilter = '';
+
+    function setFilter(filter) {
+      currentFilter = filter;
+      document.querySelectorAll('.filters button').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.filter === filter);
+      });
+      loadPosts();
+    }
+
+    async function loadPosts() {
+      const url = currentFilter ? `/api/posts?status=${currentFilter}` : '/api/posts';
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const posts = await res.json();
+      listEl.innerHTML = posts.map(p => {
+        const time = (p.scheduled_time || '').replace('T', ' ').slice(0, 16);
+        const statusClass = 'status-' + (p.status || '');
+        const statusText = { pending: '待發送', sent: '已發送', failed: '失敗' }[p.status] || p.status;
+        const msg = (p.message || '').length > 40 ? p.message.slice(0, 40) + '…' : p.message;
+        const delBtn = p.status === 'pending'
+          ? `<button type="button" data-id="${p.id}" class="btn-del">刪除</button>`
+          : '';
+        return `<tr>
+          <td>${p.id}</td>
+          <td class="${statusClass}">${statusText}</td>
+          <td>${time}</td>
+          <td class="msg" title="${(p.message || '').replace(/"/g, '&quot;')}">${escapeHtml(msg)}</td>
+          <td>${delBtn}</td>
+        </tr>`;
+      }).join('');
+
+      listEl.querySelectorAll('.btn-del').forEach(btn => {
+        btn.addEventListener('click', () => removePost(btn.dataset.id));
+      });
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
+    async function removePost(id) {
+      if (!confirm('確定要移除這則排程？')) return;
+      const res = await fetch(`/api/posts/${id}`, { method: 'DELETE' });
+      if (res.ok) loadPosts();
+      else {
+        const err = await res.json();
+        alert(err.detail || '刪除失敗');
+      }
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msgErr.textContent = '';
+      const message = document.getElementById('message').value.trim();
+      const scheduled_time = document.getElementById('scheduled_time').value;
+      const link = document.getElementById('link').value.trim() || null;
+      if (!message) {
+        msgErr.textContent = '請輸入貼文內容';
+        return;
+      }
+      try {
+        const res = await fetch('/api/posts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message, scheduled_time, link })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || '新增失敗');
+        form.reset();
+        loadPosts();
+      } catch (err) {
+        msgErr.textContent = err.message;
+      }
+    });
+
+    document.querySelectorAll('.filters button').forEach(btn => {
+      btn.addEventListener('click', () => setFilter(btn.dataset.filter));
+    });
+
+    setFilter('');
+  </script>
+</body>
+</html>
