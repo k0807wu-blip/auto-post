@@ -21,7 +21,7 @@ def _get_conn():
 
 
 def init_db():
-    """初始化資料庫：建立 posts 資料表（如果不存在）。"""
+    """初始化資料庫：建立 posts 和 config 資料表（如果不存在）。"""
     conn = _get_conn()
     try:
         with conn.cursor() as cur:
@@ -35,6 +35,13 @@ def init_db():
                     sent_at         TIMESTAMP,
                     fb_post_id      VARCHAR(100),
                     error           TEXT
+                );
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS config (
+                    key             VARCHAR(50) PRIMARY KEY,
+                    value           TEXT NOT NULL,
+                    updated_at      TIMESTAMP DEFAULT NOW()
                 );
             """)
         conn.commit()
@@ -189,3 +196,50 @@ def update_post_status(
         conn.commit()
     finally:
         conn.close()
+
+
+# ═══════════════════════════════════════════════════════════
+#  Config（Token 動態儲存）
+# ═══════════════════════════════════════════════════════════
+
+def save_config(key: str, value: str) -> None:
+    """儲存設定值（用 UPSERT，存在則更新）。"""
+    conn = _get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                INSERT INTO config (key, value, updated_at)
+                VALUES (%s, %s, NOW())
+                ON CONFLICT (key)
+                DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+                """,
+                (key, value),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_config(key: str) -> str | None:
+    """讀取設定值，找不到回傳 None。"""
+    conn = _get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT value FROM config WHERE key = %s", (key,))
+            row = cur.fetchone()
+    finally:
+        conn.close()
+    return row[0] if row else None
+
+
+def get_active_access_token() -> str | None:
+    """取得目前有效的 Page Access Token。
+
+    優先從資料庫讀取（動態更新的永久 token），
+    若資料庫沒有則退回環境變數 FB_ACCESS_TOKEN。
+    """
+    db_token = get_config("fb_page_access_token")
+    if db_token:
+        return db_token
+    return os.getenv("FB_ACCESS_TOKEN")

@@ -18,7 +18,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 # 排程時間以台灣時區解讀（與 UI 選擇的本地時間一致）
 TZ_TAIPEI = ZoneInfo("Asia/Taipei")
 
-from db import get_post, list_posts, update_post_status, init_db
+from db import get_post, list_posts, update_post_status, init_db, get_active_access_token
 from fb_poster import publish_text_post
 
 # ── 路徑常數 ──────────────────────────────────────────────
@@ -39,7 +39,10 @@ logger = logging.getLogger("scheduler")
 # ═══════════════════════════════════════════════════════════
 
 def _execute_post(post_id: str, page_id: str, access_token: str) -> None:
-    """APScheduler 觸發時的回呼函式：發文並更新狀態。"""
+    """APScheduler 觸發時的回呼函式：發文並更新狀態。
+
+    access_token 參數作為備用，優先從資料庫讀取最新的動態 token。
+    """
     post = get_post(post_id)
 
     if post is None:
@@ -50,10 +53,12 @@ def _execute_post(post_id: str, page_id: str, access_token: str) -> None:
         logger.info(f"排程貼文 {post_id} 狀態為 {post['status']}，跳過。")
         return
 
+    # 每次發文前從 DB 讀取最新 token（永久 Page Token），退回環境變數
+    current_token = get_active_access_token() or access_token
     logger.info(f"正在發送排程貼文 {post_id}：{post['message'][:30]}...")
 
     try:
-        result = publish_text_post(page_id, access_token, post["message"])
+        result = publish_text_post(page_id, current_token, post["message"])
         fb_post_id = result.get("id")
         update_post_status(
             post_id,

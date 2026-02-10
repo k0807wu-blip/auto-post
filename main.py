@@ -4,14 +4,16 @@ import sys
 from dotenv import load_dotenv
 
 from fb_poster import get_page_info, publish_text_post, publish_link_post
-from db import add_post, list_posts, remove_post, init_db
+from db import add_post, list_posts, remove_post, init_db, save_config, get_active_access_token
 from scheduler import start_daemon, stop_daemon, daemon_status
+from token_manager import renew_page_token, debug_token
 
 load_dotenv()
 
 PAGE_ID = os.getenv("FB_PAGE_ID")
 ACCESS_TOKEN = os.getenv("FB_ACCESS_TOKEN")
-
+FB_APP_ID = os.getenv("FB_APP_ID")
+FB_APP_SECRET = os.getenv("FB_APP_SECRET")
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
@@ -154,6 +156,95 @@ def cmd_schedule_remove():
         sys.exit(1)
 
 
+def cmd_renew_token():
+    """用短期 User Token 換取永久 Page Token 並存入資料庫。"""
+    if not FB_APP_ID or not FB_APP_SECRET:
+        print("錯誤：請在 .env 中設定 FB_APP_ID 和 FB_APP_SECRET")
+        print("可在 https://developers.facebook.com 的 App 設定 > 基本資料 中找到")
+        sys.exit(1)
+
+    print("=== Facebook Token 更新工具 ===")
+    print()
+    print("請先到 Graph API Explorer 取得一組新的短期 User Token：")
+    print("https://developers.facebook.com/tools/explorer/?method=GET&path=me%2Faccounts&version=v24.0")
+    print()
+    print("步驟：")
+    print("  1. 按「Generate Access Token」並完成授權")
+    print("  2. 複製上方的 Access Token")
+    print("  3. 貼到下方")
+    print()
+    short_token = input("請貼上短期 User Token: ").strip()
+    if not short_token:
+        print("錯誤：Token 不可為空。")
+        sys.exit(1)
+
+    try:
+        page_token = renew_page_token(
+            app_id=FB_APP_ID,
+            app_secret=FB_APP_SECRET,
+            short_lived_token=short_token,
+            page_id=PAGE_ID,
+        )
+
+        # 存入資料庫
+        save_config("fb_page_access_token", page_token)
+        print()
+        print("✅ 永久 Page Token 已儲存到資料庫！")
+        print("   之後排程器發文會自動使用這個 token，不再需要手動更新。")
+        print()
+        print(f"   Token 前 20 字元：{page_token[:20]}...")
+    except Exception as e:
+        print(f"\n❌ 失敗：{e}")
+        sys.exit(1)
+
+
+def cmd_check_token():
+    """檢查目前使用的 token 狀態。"""
+    if not FB_APP_ID or not FB_APP_SECRET:
+        print("錯誤：請在 .env 中設定 FB_APP_ID 和 FB_APP_SECRET 才能檢查 token")
+        sys.exit(1)
+
+    token = get_active_access_token()
+    if not token:
+        print("❌ 找不到任何 Access Token（資料庫和環境變數都沒有）。")
+        print("   請執行 python main.py renew-token 來設定。")
+        sys.exit(1)
+
+    source = "資料庫（永久 Token）" if token != ACCESS_TOKEN else "環境變數 FB_ACCESS_TOKEN"
+    print(f"目前使用的 Token 來源：{source}")
+    print(f"Token 前 20 字元：{token[:20]}...")
+    print()
+
+    try:
+        info = debug_token(token, FB_APP_ID, FB_APP_SECRET)
+        is_valid = info.get("is_valid", False)
+        expires = info.get("expires_at", 0)
+        app_name = info.get("application", "")
+        token_type = info.get("type", "")
+
+        if is_valid:
+            print(f"✅ Token 有效")
+        else:
+            print(f"❌ Token 已失效")
+
+        print(f"   類型：{token_type}")
+        print(f"   App：{app_name}")
+
+        if expires == 0:
+            print(f"   到期：永不過期")
+        else:
+            from datetime import datetime
+            exp_dt = datetime.fromtimestamp(expires)
+            print(f"   到期：{exp_dt.strftime('%Y-%m-%d %H:%M:%S')}")
+
+        scopes = info.get("scopes", [])
+        if scopes:
+            print(f"   權限：{', '.join(scopes)}")
+    except Exception as e:
+        print(f"⚠️  無法檢查 token 詳細資訊：{e}")
+        print("   但 token 可能仍然有效，可嘗試 python main.py verify 測試。")
+
+
 def cmd_start():
     """啟動排程器。"""
     print("正在啟動排程器...")
@@ -195,6 +286,10 @@ def main():
         print("  python main.py start                      - 啟動排程器")
         print("  python main.py stop                       - 停止排程器")
         print("  python main.py status                     - 查看排程器狀態")
+        print()
+        print("  Token 管理:")
+        print("  python main.py renew-token                - 更新永久 Page Token")
+        print("  python main.py check-token                - 檢查 Token 狀態")
         sys.exit(0)
 
     command = sys.argv[1]
@@ -220,6 +315,10 @@ def main():
         cmd_stop()
     elif command == "status":
         cmd_status()
+    elif command == "renew-token":
+        cmd_renew_token()
+    elif command == "check-token":
+        cmd_check_token()
     else:
         print(f"未知指令: {command}")
         sys.exit(1)

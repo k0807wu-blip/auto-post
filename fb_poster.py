@@ -1,7 +1,29 @@
+import logging
 import requests
 
-
+logger = logging.getLogger("fb_poster")
 GRAPH_API_BASE = "https://graph.facebook.com/v24.0"
+
+
+def _raise_with_fb_error(resp: requests.Response) -> None:
+    """若 API 回傳錯誤，記錄 Facebook 回傳內容後拋出 HTTPError。"""
+    try:
+        body = resp.json()
+        err = body.get("error", {})
+        msg = err.get("message", body)
+        code = err.get("code", "")
+        subcode = err.get("error_subcode", "")
+        logger.error(
+            "Facebook API 錯誤: %s %s (code=%s, subcode=%s)",
+            resp.status_code, msg, code, subcode,
+        )
+        raise requests.HTTPError(
+            f"{resp.status_code} {resp.reason}: {msg}",
+            response=resp,
+        )
+    except (ValueError, KeyError):
+        logger.error("Facebook API 錯誤回應 (非 JSON): %s", resp.text[:500])
+        resp.raise_for_status()
 
 
 def publish_text_post(page_id: str, access_token: str, message: str) -> dict:
@@ -25,7 +47,8 @@ def publish_text_post(page_id: str, access_token: str, message: str) -> dict:
     }
 
     resp = requests.post(url, params=params, timeout=30)
-    resp.raise_for_status()
+    if not resp.ok:
+        _raise_with_fb_error(resp)
     return resp.json()
 
 
