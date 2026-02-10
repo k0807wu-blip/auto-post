@@ -11,8 +11,12 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from apscheduler.schedulers.background import BackgroundScheduler
+
+# 排程時間以台灣時區解讀（與 UI 選擇的本地時間一致）
+TZ_TAIPEI = ZoneInfo("Asia/Taipei")
 
 from db import get_post, list_posts, update_post_status, init_db
 from fb_poster import publish_text_post
@@ -81,8 +85,10 @@ def _register_pending_posts(
             continue
 
         scheduled_dt = datetime.fromisoformat(post["scheduled_time"])
+        now_tw = datetime.now(TZ_TAIPEI)
+        now_naive_tw = now_tw.replace(tzinfo=None)
 
-        if scheduled_dt <= datetime.now():
+        if scheduled_dt <= now_naive_tw:
             # 已過時的貼文，立即執行
             logger.warning(
                 f"排程貼文 {post['id']} 已過時 ({post['scheduled_time']})，立即執行。"
@@ -90,7 +96,7 @@ def _register_pending_posts(
             scheduler.add_job(
                 _execute_post,
                 "date",
-                run_date=datetime.now(),
+                run_date=now_tw,
                 args=[post["id"], page_id, access_token],
                 id=job_id,
             )
@@ -141,7 +147,7 @@ def start_daemon(page_id: str, access_token: str) -> None:
             # 舊行程已死，清理過期 PID 檔
             PID_FILE.unlink()
 
-    scheduler = BackgroundScheduler()
+    scheduler = BackgroundScheduler(timezone=TZ_TAIPEI)
     scheduler.start()
 
     # 寫入 PID 檔
