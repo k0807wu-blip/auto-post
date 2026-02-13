@@ -135,29 +135,17 @@ def _sync_new_posts(
 #  背景常駐排程器
 # ═══════════════════════════════════════════════════════════
 
-def start_daemon(page_id: str, access_token: str) -> None:
-    """啟動背景排程器（前景執行，Ctrl+C 或 SIGTERM 停止）。"""
-    # 初始化資料庫
-    init_db()
+def start_background_scheduler(page_id: str, access_token: str) -> BackgroundScheduler:
+    """啟動背景排程器（非阻塞），回傳 scheduler 實例。
 
-    # 檢查是否已在執行中
-    if PID_FILE.exists():
-        old_pid = int(PID_FILE.read_text().strip())
-        try:
-            os.kill(old_pid, 0)
-            print(f"排程器已在執行中 (PID: {old_pid})。")
-            print("如需重啟，請先執行: python main.py stop")
-            return
-        except OSError:
-            # 舊行程已死，清理過期 PID 檔
-            PID_FILE.unlink()
+    供 Web 應用（uvicorn）在啟動時呼叫，讓排程器跑在同一行程中。
+    """
+    init_db()
 
     scheduler = BackgroundScheduler(timezone=TZ_TAIPEI)
     scheduler.start()
 
-    # 寫入 PID 檔
-    PID_FILE.write_text(str(os.getpid()))
-    logger.info(f"排程器已啟動 (PID: {os.getpid()})")
+    logger.info(f"背景排程器已啟動 (PID: {os.getpid()})")
 
     # 註冊所有 pending 貼文
     count = _register_pending_posts(scheduler, page_id, access_token)
@@ -171,6 +159,28 @@ def start_daemon(page_id: str, access_token: str) -> None:
         args=[scheduler, page_id, access_token],
         id="__sync_new_posts__",
     )
+
+    return scheduler
+
+
+def start_daemon(page_id: str, access_token: str) -> None:
+    """啟動背景排程器（前景執行，Ctrl+C 或 SIGTERM 停止）。"""
+    # 檢查是否已在執行中
+    if PID_FILE.exists():
+        old_pid = int(PID_FILE.read_text().strip())
+        try:
+            os.kill(old_pid, 0)
+            print(f"排程器已在執行中 (PID: {old_pid})。")
+            print("如需重啟，請先執行: python main.py stop")
+            return
+        except OSError:
+            # 舊行程已死，清理過期 PID 檔
+            PID_FILE.unlink()
+
+    scheduler = start_background_scheduler(page_id, access_token)
+
+    # 寫入 PID 檔
+    PID_FILE.write_text(str(os.getpid()))
 
     # 優雅關閉
     def shutdown(signum, frame):

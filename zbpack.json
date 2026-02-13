@@ -1,3 +1,3 @@
 {
-  "start_command": "python3 main.py start"
+  "start_command": "uvicorn web:app --host 0.0.0.0 --port 8080"
 }

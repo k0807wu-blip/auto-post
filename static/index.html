@@ -32,6 +32,15 @@
     .btn-success { background: #198754; color: #fff; border: none; border-radius: 4px; }
     .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 6px; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    .token-section { background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; padding: 1rem; margin-top: 1.5rem; }
+    .token-section h2 { margin-top: 0; }
+    .token-status { padding: 0.75rem; border-radius: 4px; margin-top: 0.5rem; font-size: 0.9rem; }
+    .token-valid { background: #e8f5e9; border: 1px solid #a5d6a7; }
+    .token-invalid { background: #ffebee; border: 1px solid #ef9a9a; }
+    .token-unknown { background: #f5f5f5; border: 1px solid #e0e0e0; }
+    .token-renew { margin-top: 0.75rem; }
+    .token-renew input { margin-top: 0.25rem; }
+    .success { color: #198754; margin-top: 0.5rem; }
   </style>
 </head>
 <body>
@@ -77,6 +86,18 @@
       </thead>
       <tbody id="list"></tbody>
     </table>
+  </section>
+
+  <section class="token-section">
+    <h2>Token 管理</h2>
+    <div id="token_status" class="token-status token-unknown">載入中...</div>
+    <div class="token-renew">
+      <label>更新 Token（貼上從 <a href="https://developers.facebook.com/tools/explorer/?method=GET&path=me%2Faccounts&version=v24.0" target="_blank">Graph API Explorer</a> 取得的短期 Token）</label>
+      <input type="text" id="token_input" placeholder="貼上短期 User Token 或 Page Token" />
+      <button type="button" id="token_renew_btn" class="btn-primary" onclick="renewToken()">更新 Token</button>
+      <div class="error" id="token_err"></div>
+      <div class="success" id="token_ok"></div>
+    </div>
   </section>
 
   <script>
@@ -213,6 +234,70 @@
     function regenerate() {
       generateArticle();
     }
+
+    /* ── Token 管理 ── */
+    async function loadTokenStatus() {
+      const el = document.getElementById('token_status');
+      try {
+        const res = await fetch('/api/token/status');
+        const data = await res.json();
+        if (data.error) {
+          el.className = 'token-status token-unknown';
+          el.textContent = data.error;
+          return;
+        }
+        if (!data.has_token) {
+          el.className = 'token-status token-invalid';
+          el.textContent = '尚未設定 Token，請在下方貼上短期 Token 來更新。';
+          return;
+        }
+        if (data.is_valid) {
+          const expires = data.expires_at === 0 ? '永不過期' : new Date(data.expires_at * 1000).toLocaleString('zh-TW');
+          const src = data.source === 'database' ? '資料庫（永久 Token）' : '環境變數';
+          el.className = 'token-status token-valid';
+          el.innerHTML = `Token 有效 &nbsp;|&nbsp; 來源：${src} &nbsp;|&nbsp; 到期：${expires} &nbsp;|&nbsp; 類型：${data.type || '-'}`;
+        } else {
+          el.className = 'token-status token-invalid';
+          el.textContent = 'Token 已失效，請在下方更新。';
+        }
+      } catch (e) {
+        el.className = 'token-status token-unknown';
+        el.textContent = '無法載入 Token 狀態';
+      }
+    }
+
+    async function renewToken() {
+      const input = document.getElementById('token_input');
+      const errEl = document.getElementById('token_err');
+      const okEl = document.getElementById('token_ok');
+      const btn = document.getElementById('token_renew_btn');
+      errEl.textContent = '';
+      okEl.textContent = '';
+      const short_token = input.value.trim();
+      if (!short_token) { errEl.textContent = '請貼上 Token'; return; }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>更新中...';
+      try {
+        const res = await fetch('/api/token/renew', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ short_token })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || '更新失敗');
+        okEl.textContent = '永久 Page Token 更新成功！';
+        input.value = '';
+        loadTokenStatus();
+      } catch (e) {
+        errEl.textContent = e.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '更新 Token';
+      }
+    }
+
+    loadTokenStatus();
   </script>
 </body>
 </html>
