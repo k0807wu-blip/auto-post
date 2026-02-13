@@ -22,6 +22,16 @@
     .status-failed { color: #c00; }
     .msg { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .error { color: #c00; margin-top: 0.5rem; }
+    .ai-section { background: #f8f9fa; border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin-top: 1.5rem; }
+    .ai-section h2 { margin-top: 0; }
+    .ai-preview { background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 1rem; margin-top: 0.75rem; white-space: pre-wrap; min-height: 60px; max-height: 400px; overflow-y: auto; }
+    .ai-actions { margin-top: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .ai-actions button { margin-top: 0; }
+    .btn-primary { background: #0d6efd; color: #fff; border: none; border-radius: 4px; }
+    .btn-secondary { background: #6c757d; color: #fff; border: none; border-radius: 4px; }
+    .btn-success { background: #198754; color: #fff; border: none; border-radius: 4px; }
+    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -38,6 +48,19 @@
       <input type="url" id="link" name="link" placeholder="https://" />
       <button type="submit">新增排程</button>
     </form>
+  </section>
+
+  <section class="ai-section">
+    <h2>AI 自動產文</h2>
+    <label>輸入主題 / 方向描述</label>
+    <input type="text" id="ai_topic" placeholder="例：SBIR 計畫申請攻略、個人品牌經營心得" />
+    <button type="button" id="ai_gen_btn" class="btn-primary" onclick="generateArticle()">生成文章</button>
+    <div id="ai_preview" class="ai-preview" style="display:none;"></div>
+    <div id="ai_actions" class="ai-actions" style="display:none;">
+      <button type="button" class="btn-success" onclick="useArticle()">填入排程表單</button>
+      <button type="button" class="btn-secondary" onclick="regenerate()">重新生成</button>
+    </div>
+    <div class="error" id="ai_err"></div>
   </section>
 
   <section>
@@ -143,6 +166,53 @@
     });
 
     setFilter('');
+
+    /* ── AI 產文 ── */
+    let lastArticle = '';
+
+    async function generateArticle() {
+      const topic = document.getElementById('ai_topic').value.trim();
+      const errEl = document.getElementById('ai_err');
+      const previewEl = document.getElementById('ai_preview');
+      const actionsEl = document.getElementById('ai_actions');
+      const btn = document.getElementById('ai_gen_btn');
+      errEl.textContent = '';
+      if (!topic) { errEl.textContent = '請輸入主題'; return; }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span>生成中...';
+      previewEl.style.display = 'none';
+      actionsEl.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || '生成失敗');
+        lastArticle = data.article;
+        previewEl.textContent = lastArticle;
+        previewEl.style.display = 'block';
+        actionsEl.style.display = 'flex';
+      } catch (e) {
+        errEl.textContent = e.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '生成文章';
+      }
+    }
+
+    function useArticle() {
+      if (!lastArticle) return;
+      document.getElementById('message').value = lastArticle;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function regenerate() {
+      generateArticle();
+    }
   </script>
 </body>
 </html>

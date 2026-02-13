@@ -7,6 +7,7 @@ from fb_poster import get_page_info, publish_text_post, publish_link_post
 from db import add_post, list_posts, remove_post, init_db, save_config, get_active_access_token
 from scheduler import start_daemon, stop_daemon, daemon_status
 from token_manager import renew_page_token, debug_token
+from ai_writer import generate_article
 
 load_dotenv()
 
@@ -245,6 +246,40 @@ def cmd_check_token():
         print("   但 token 可能仍然有效，可嘗試 python main.py verify 測試。")
 
 
+def cmd_generate():
+    """用 AI 生成一篇 Facebook 貼文。"""
+    if len(sys.argv) < 3:
+        print('用法: python main.py generate "主題描述"')
+        print('範例: python main.py generate "SBIR 計畫申請攻略"')
+        sys.exit(1)
+
+    topic = sys.argv[2]
+    print(f"正在用 AI 生成文章... 主題：{topic}")
+    print()
+
+    try:
+        article = generate_article(topic)
+        print("═" * 50)
+        print(article)
+        print("═" * 50)
+        print()
+
+        choice = input("要如何處理這篇文章？ (1) 立即發文  (2) 排入排程  (3) 放棄：").strip()
+        if choice == "1":
+            token = get_active_access_token() or ACCESS_TOKEN
+            result = publish_text_post(PAGE_ID, token, article)
+            print(f"發文成功！貼文 ID: {result.get('id')}")
+        elif choice == "2":
+            time_str = input("請輸入排程時間 (YYYY/MM/DD HH:MM)：").strip()
+            post = add_post(article, time_str)
+            print(f"已排入排程！ID: {post['id']}，時間: {post['scheduled_time'].replace('T', ' ')}")
+        else:
+            print("已放棄。")
+    except Exception as e:
+        print(f"錯誤：{e}")
+        sys.exit(1)
+
+
 def cmd_start():
     """啟動排程器。"""
     print("正在啟動排程器...")
@@ -290,6 +325,9 @@ def main():
         print("  Token 管理:")
         print("  python main.py renew-token                - 更新永久 Page Token")
         print("  python main.py check-token                - 檢查 Token 狀態")
+        print()
+        print("  AI 產文:")
+        print('  python main.py generate "主題"             - AI 生成貼文')
         sys.exit(0)
 
     command = sys.argv[1]
@@ -319,6 +357,8 @@ def main():
         cmd_renew_token()
     elif command == "check-token":
         cmd_check_token()
+    elif command == "generate":
+        cmd_generate()
     else:
         print(f"未知指令: {command}")
         sys.exit(1)

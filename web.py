@@ -10,6 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from db import init_db, add_post, list_posts, remove_post
+from ai_writer import generate_article
 
 load_dotenv()
 
@@ -22,6 +23,10 @@ class AddPostBody(BaseModel):
     message: str
     scheduled_time: str  # "YYYY-MM-DDTHH:MM" 或 "YYYY-MM-DD HH:MM"
     link: str | None = None
+
+
+class GenerateBody(BaseModel):
+    topic: str
 
 
 @app.on_event("startup")
@@ -56,6 +61,18 @@ def api_remove_post(post_id: str):
         return remove_post(post_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/generate")
+def api_generate(body: GenerateBody):
+    """用 AI 生成一篇 Facebook 貼文。"""
+    if not body.topic.strip():
+        raise HTTPException(status_code=400, detail="主題不可為空")
+    try:
+        article = generate_article(body.topic.strip())
+        return {"article": article}
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/")
