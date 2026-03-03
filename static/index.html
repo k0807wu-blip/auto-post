@@ -3,142 +3,300 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Facebook 自動發文排程</title>
+  <title>FB 自動發文排程系統 | 管理後台</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <style>
-    * { box-sizing: border-box; }
-    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 0 auto; padding: 1.5rem; }
-    h1 { font-size: 1.25rem; margin-bottom: 1rem; }
-    label { display: block; margin-top: 0.75rem; font-weight: 500; }
-    input, textarea { width: 100%; padding: 0.5rem; margin-top: 0.25rem; }
-    textarea { min-height: 80px; resize: vertical; }
-    button { margin-top: 1rem; padding: 0.5rem 1rem; cursor: pointer; }
-    .filters { margin: 1rem 0; }
-    .filters button { margin-right: 0.5rem; margin-top: 0; }
-    .filters button.active { background: #333; color: #fff; }
-    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-    th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #eee; }
-    .status-pending { color: #b8860b; }
-    .status-sent { color: #228b22; }
-    .status-failed { color: #c00; }
-    .msg { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .error { color: #c00; margin-top: 0.5rem; }
-    .ai-section { background: #f8f9fa; border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin-top: 1.5rem; }
-    .ai-section h2 { margin-top: 0; }
-    .ai-preview { background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 1rem; margin-top: 0.75rem; white-space: pre-wrap; min-height: 60px; max-height: 400px; overflow-y: auto; }
-    .ai-actions { margin-top: 0.75rem; display: flex; gap: 0.5rem; flex-wrap: wrap; }
-    .ai-actions button { margin-top: 0; }
-    .btn-primary { background: #0d6efd; color: #fff; border: none; border-radius: 4px; }
-    .btn-secondary { background: #6c757d; color: #fff; border: none; border-radius: 4px; }
-    .btn-success { background: #198754; color: #fff; border: none; border-radius: 4px; }
-    .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 6px; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .token-section { background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; padding: 1rem; margin-top: 1.5rem; }
-    .token-section h2 { margin-top: 0; }
-    .token-status { padding: 0.75rem; border-radius: 4px; margin-top: 0.5rem; font-size: 0.9rem; }
-    .token-valid { background: #e8f5e9; border: 1px solid #a5d6a7; }
-    .token-invalid { background: #ffebee; border: 1px solid #ef9a9a; }
-    .token-unknown { background: #f5f5f5; border: 1px solid #e0e0e0; }
-    .token-renew { margin-top: 0.75rem; }
-    .token-renew input { margin-top: 0.25rem; }
-    .success { color: #198754; margin-top: 0.5rem; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background-color: #f0f2f5; }
+    .fb-blue { color: #1877F2; }
+    .bg-fb-blue { background-color: #1877F2; }
+    .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
+    .btn-transition { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+    .spinner { animation: spin 1s linear infinite; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .status-badge { padding: 2px 8px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
   </style>
 </head>
-<body>
-  <h1>Facebook 自動發文排程</h1>
+<body class="text-slate-800 antialiased">
 
-  <section>
-    <h2>新增排程</h2>
-    <form id="form">
-      <label>貼文內容 <span class="error" id="msgErr"></span></label>
-      <textarea id="message" name="message" required></textarea>
-      <label>排程時間</label>
-      <input type="datetime-local" id="scheduled_time" name="scheduled_time" required />
-      <label>附加連結（選填）</label>
-      <input type="url" id="link" name="link" placeholder="https://" />
-      <button type="submit">新增排程</button>
-    </form>
-  </section>
-
-  <section class="ai-section">
-    <h2>AI 自動產文</h2>
-    <label>輸入主題 / 方向描述</label>
-    <input type="text" id="ai_topic" placeholder="例：SBIR 計畫申請攻略、個人品牌經營心得" />
-    <button type="button" id="ai_gen_btn" class="btn-primary" onclick="generateArticle()">生成文章</button>
-    <div id="ai_preview" class="ai-preview" style="display:none;"></div>
-    <div id="ai_actions" class="ai-actions" style="display:none;">
-      <button type="button" class="btn-success" onclick="useArticle()">填入排程表單</button>
-      <button type="button" class="btn-secondary" onclick="regenerate()">重新生成</button>
+  <!-- Top Navigation -->
+  <nav class="sticky top-0 z-50 bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center shadow-sm">
+    <div class="flex items-center gap-2">
+      <div class="bg-fb-blue p-2 rounded-lg">
+        <i data-lucide="facebook" class="text-white w-6 h-6"></i>
+      </div>
+      <h1 class="text-xl font-bold tracking-tight text-slate-900">FB 自動發文排程</h1>
     </div>
-    <div class="error" id="ai_err"></div>
-  </section>
-
-  <section>
-    <h2>排程列表</h2>
-    <div class="filters">
-      <button type="button" data-filter="">全部</button>
-      <button type="button" data-filter="pending">待發送</button>
-      <button type="button" data-filter="sent">已發送</button>
-      <button type="button" data-filter="failed">失敗</button>
+    <div class="flex items-center gap-4">
+       <span id="global_status" class="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 text-slate-600 font-medium">
+         <div class="w-2 h-2 rounded-full bg-slate-400"></div>
+         系統連線中
+       </span>
     </div>
-    <table>
-      <thead>
-        <tr><th>ID</th><th>狀態</th><th>排程時間</th><th>貼文內容</th><th>操作</th></tr>
-      </thead>
-      <tbody id="list"></tbody>
-    </table>
-  </section>
+  </nav>
 
-  <section class="token-section">
-    <h2>Token 管理</h2>
-    <div id="token_status" class="token-status token-unknown">載入中...</div>
-    <div class="token-renew">
-      <label>更新 Token（貼上從 <a href="https://developers.facebook.com/tools/explorer/?method=GET&path=me%2Faccounts&version=v24.0" target="_blank">Graph API Explorer</a> 取得的短期 Token）</label>
-      <input type="text" id="token_input" placeholder="貼上短期 User Token 或 Page Token" />
-      <button type="button" id="token_renew_btn" class="btn-primary" onclick="renewToken()">更新 Token</button>
-      <div class="error" id="token_err"></div>
-      <div class="success" id="token_ok"></div>
+  <main class="max-w-6xl mx-auto p-4 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+    
+    <!-- Left Column: Form & AI -->
+    <div class="lg:col-span-5 space-y-6">
+      
+      <!-- Create Post Card -->
+      <section class="glass-card rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-5 border-b border-slate-100 bg-white flex items-center gap-2">
+          <i data-lucide="plus-circle" class="w-5 h-5 fb-blue"></i>
+          <h2 class="font-semibold text-slate-800">新增貼文排程</h2>
+        </div>
+        <form id="form" class="p-6 space-y-4">
+          <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5 flex justify-between">
+              貼文內容 <span id="msgErr" class="text-red-500 font-normal text-xs"></span>
+            </label>
+            <textarea id="message" name="message" required
+              class="w-full rounded-xl border-slate-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-h-[120px] p-3 text-sm transition-all"
+              placeholder="想分享些什麼呢？"></textarea>
+          </div>
+          
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1.5">排程時間</label>
+              <input type="datetime-local" id="scheduled_time" name="scheduled_time" required
+                class="w-full rounded-xl border-slate-200 focus:ring-2 focus:ring-blue-500 text-sm p-2.5">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1.5">附加連結</label>
+              <input type="url" id="link" name="link" placeholder="https://"
+                class="w-full rounded-xl border-slate-200 focus:ring-2 focus:ring-blue-500 text-sm p-2.5">
+            </div>
+          </div>
+
+          <button type="submit" class="w-full bg-fb-blue hover:bg-blue-600 text-white font-bold py-3 rounded-xl shadow-md shadow-blue-200 transition-all flex justify-center items-center gap-2 group">
+            <i data-lucide="send" class="w-4 h-4 group-hover:translate-x-1 transition-transform"></i>
+            建立排程
+          </button>
+        </form>
+      </section>
+
+      <!-- AI Section Card -->
+      <section class="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl shadow-sm border border-blue-100 overflow-hidden">
+        <div class="p-5 border-b border-blue-100 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i data-lucide="sparkles" class="w-5 h-5 text-indigo-600"></i>
+            <h2 class="font-semibold text-slate-800">AI 智能撰稿</h2>
+          </div>
+          <span class="text-[10px] bg-indigo-600 text-white px-2 py-0.5 rounded uppercase font-black">AI Beta</span>
+        </div>
+        <div class="p-6 space-y-4">
+          <div class="relative">
+            <input type="text" id="ai_topic" 
+              class="w-full rounded-xl border-slate-200 focus:ring-2 focus:ring-indigo-500 pl-10 pr-4 py-3 text-sm"
+              placeholder="輸入主題（如：數位轉型趨勢、美食開箱）">
+            <i data-lucide="pen-tool" class="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400"></i>
+          </div>
+          
+          <button type="button" id="ai_gen_btn" onclick="generateArticle()"
+            class="w-full bg-white border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-600 hover:text-white font-bold py-2.5 rounded-xl transition-all flex justify-center items-center gap-2">
+            生成文章內容
+          </button>
+
+          <div id="ai_result_container" class="space-y-3" style="display:none;">
+            <div id="ai_preview" class="bg-white border border-indigo-100 rounded-xl p-4 text-sm leading-relaxed text-slate-600 max-h-60 overflow-y-auto custom-scrollbar whitespace-pre-wrap"></div>
+            <div id="ai_actions" class="flex gap-2">
+              <button onclick="useArticle()" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-indigo-700 transition-all">套用至表單</button>
+              <button onclick="regenerate()" class="px-3 bg-slate-100 text-slate-600 py-2 rounded-lg hover:bg-slate-200 transition-all">
+                <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+          <div class="text-red-500 text-xs mt-1" id="ai_err"></div>
+        </div>
+      </section>
     </div>
-  </section>
+
+    <!-- Right Column: List & Token -->
+    <div class="lg:col-span-7 space-y-6">
+      
+      <!-- List Card -->
+      <section class="glass-card rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]">
+        <div class="p-5 border-b border-slate-100 bg-white flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="flex items-center gap-2">
+            <i data-lucide="list" class="w-5 h-5 fb-blue"></i>
+            <h2 class="font-semibold text-slate-800">排程列表</h2>
+          </div>
+          <div class="flex bg-slate-100 p-1 rounded-lg">
+            <button onclick="setFilter('')" data-filter="" class="filter-btn active px-3 py-1 text-xs font-semibold rounded-md transition-all">全部</button>
+            <button onclick="setFilter('pending')" data-filter="pending" class="filter-btn px-3 py-1 text-xs font-semibold rounded-md transition-all">待發送</button>
+            <button onclick="setFilter('sent')" data-filter="sent" class="filter-btn px-3 py-1 text-xs font-semibold rounded-md transition-all">已發送</button>
+            <button onclick="setFilter('failed')" data-filter="failed" class="filter-btn px-3 py-1 text-xs font-semibold rounded-md transition-all">失敗</button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm border-collapse">
+            <thead class="bg-slate-50/50 text-slate-500 font-medium">
+              <tr>
+                <th class="px-6 py-4 border-b border-slate-100">狀態</th>
+                <th class="px-6 py-4 border-b border-slate-100">內容預覽</th>
+                <th class="px-6 py-4 border-b border-slate-100">排程時間</th>
+                <th class="px-6 py-4 border-b border-slate-100 text-right">操作</th>
+              </tr>
+            </thead>
+            <tbody id="list" class="divide-y divide-slate-50">
+              <!-- JS Content -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Token Management Card -->
+      <section class="glass-card rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div class="p-5 border-b border-slate-100 flex items-center gap-2">
+          <i data-lucide="key" class="w-5 h-5 text-orange-500"></i>
+          <h2 class="font-semibold text-slate-800">Token 安全管理</h2>
+        </div>
+        <div class="p-6 space-y-4">
+          <div id="token_status_container" class="rounded-xl p-4 flex items-start gap-3 transition-colors">
+            <div id="token_icon_box" class="p-2 rounded-lg bg-slate-100">
+               <i data-lucide="shield-alert" id="token_icon" class="w-5 h-5 text-slate-400"></i>
+            </div>
+            <div>
+              <p id="token_status_title" class="font-bold text-sm mb-0.5">狀態偵測中...</p>
+              <p id="token_status_desc" class="text-xs text-slate-500 leading-normal">請稍候，正在向 Facebook 驗證金鑰狀態</p>
+            </div>
+          </div>
+
+          <div class="bg-slate-50 rounded-xl p-4 border border-dashed border-slate-300">
+             <label class="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">更新短期 Token</label>
+             <div class="flex gap-2">
+               <input type="text" id="token_input" placeholder="貼上從 Graph API Explorer 取得的 Token"
+                 class="flex-1 rounded-lg border-slate-200 text-xs p-2.5 focus:ring-2 focus:ring-orange-500">
+               <button id="token_renew_btn" onclick="renewToken()" 
+                 class="bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-black transition-all">
+                 更新
+               </button>
+             </div>
+             <p class="text-[10px] text-slate-400 mt-2 flex items-center gap-1">
+               <i data-lucide="info" class="w-3 h-3"></i>
+               此動作將自動為您向 FB 申請換發永久 Page Token
+             </p>
+          </div>
+          <div id="token_msg" class="text-center text-xs"></div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Notification Toast System -->
+  <div id="toast_container" class="fixed bottom-6 right-6 z-[100] space-y-3 pointer-events-none"></div>
 
   <script>
+    // Initialize Lucide Icons
+    lucide.createIcons();
+
     const form = document.getElementById('form');
     const listEl = document.getElementById('list');
     const msgErr = document.getElementById('msgErr');
+    const globalStatus = document.getElementById('global_status');
     let currentFilter = '';
 
+    // --- Toast Notification ---
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast_container');
+      const toast = document.createElement('div');
+      toast.className = `flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl border pointer-events-auto transform translate-y-4 opacity-0 transition-all duration-300 bg-white ${type === 'success' ? 'border-green-100' : 'border-red-100'}`;
+      
+      const icon = type === 'success' ? 'check-circle' : 'alert-circle';
+      const color = type === 'success' ? 'text-green-500' : 'text-red-500';
+      
+      toast.innerHTML = `
+        <i data-lucide="${icon}" class="${color} w-5 h-5"></i>
+        <span class="text-sm font-medium text-slate-700">${message}</span>
+      `;
+      container.appendChild(toast);
+      lucide.createIcons();
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-4', 'opacity-0');
+      }, 10);
+
+      setTimeout(() => {
+        toast.classList.add('translate-y-4', 'opacity-0');
+        setTimeout(() => toast.remove(), 300);
+      }, 4000);
+    }
+
+    // --- List Logic ---
     function setFilter(filter) {
       currentFilter = filter;
-      document.querySelectorAll('.filters button').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.filter === filter);
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        if (btn.dataset.filter === filter) {
+          btn.classList.add('active', 'bg-white', 'shadow-sm', 'text-fb-blue');
+          btn.classList.remove('text-slate-500');
+        } else {
+          btn.classList.remove('active', 'bg-white', 'shadow-sm', 'text-fb-blue');
+          btn.classList.add('text-slate-500');
+        }
       });
       loadPosts();
     }
 
     async function loadPosts() {
-      const url = currentFilter ? `/api/posts?status=${currentFilter}` : '/api/posts';
-      const res = await fetch(url);
-      if (!res.ok) return;
-      const posts = await res.json();
-      listEl.innerHTML = posts.map(p => {
-        const time = (p.scheduled_time || '').replace('T', ' ').slice(0, 16);
-        const statusClass = 'status-' + (p.status || '');
-        const statusText = { pending: '待發送', sent: '已發送', failed: '失敗' }[p.status] || p.status;
-        const msg = (p.message || '').length > 40 ? p.message.slice(0, 40) + '…' : p.message;
-        const delBtn = p.status === 'pending'
-          ? `<button type="button" data-id="${p.id}" class="btn-del">刪除</button>`
-          : '';
-        return `<tr>
-          <td>${p.id}</td>
-          <td class="${statusClass}">${statusText}</td>
-          <td>${time}</td>
-          <td class="msg" title="${(p.message || '').replace(/"/g, '&quot;')}">${escapeHtml(msg)}</td>
-          <td>${delBtn}</td>
-        </tr>`;
-      }).join('');
+      try {
+        const url = currentFilter ? `/api/posts?status=${currentFilter}` : '/api/posts';
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('無法連線至 API');
+        
+        const posts = await res.json();
+        if (posts.length === 0) {
+          listEl.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-slate-400">
+            <i data-lucide="inbox" class="w-8 h-8 mx-auto mb-2 opacity-20"></i>
+            沒有找到任何排程
+          </td></tr>`;
+          lucide.createIcons();
+          return;
+        }
 
-      listEl.querySelectorAll('.btn-del').forEach(btn => {
-        btn.addEventListener('click', () => removePost(btn.dataset.id));
-      });
+        listEl.innerHTML = posts.map(p => {
+          const time = (p.scheduled_time || '').replace('T', ' ').slice(0, 16);
+          const statusMap = {
+            pending: { label: '待發送', class: 'bg-amber-100 text-amber-700' },
+            sent: { label: '已發送', class: 'bg-green-100 text-green-700' },
+            failed: { label: '發送失敗', class: 'bg-red-100 text-red-700' }
+          };
+          const status = statusMap[p.status] || { label: p.status, class: 'bg-slate-100 text-slate-700' };
+          const msgPreview = (p.message || '').length > 50 ? p.message.slice(0, 50) + '...' : p.message;
+          
+          return `
+            <tr class="hover:bg-slate-50/50 transition-colors group">
+              <td class="px-6 py-4">
+                <span class="status-badge ${status.class}">${status.label}</span>
+              </td>
+              <td class="px-6 py-4">
+                <div class="max-w-[250px] overflow-hidden text-ellipsis whitespace-nowrap text-slate-600" title="${escapeHtml((p.message || ''))}">
+                  ${escapeHtml(msgPreview)}
+                </div>
+              </td>
+              <td class="px-6 py-4 text-xs font-medium text-slate-500">
+                ${time}
+              </td>
+              <td class="px-6 py-4 text-right">
+                ${p.status === 'pending' ? `
+                  <button onclick="removePost('${String(p.id).replace(/'/g, "\\'")}')" class="p-2 text-slate-300 hover:text-red-500 transition-colors">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                  </button>
+                ` : `<i data-lucide="check" class="w-4 h-4 text-green-400 inline-block mr-2"></i>`}
+              </td>
+            </tr>
+          `;
+        }).join('');
+        lucide.createIcons();
+      } catch (e) {
+        console.error(e);
+      }
     }
 
     function escapeHtml(s) {
@@ -148,12 +306,18 @@
     }
 
     async function removePost(id) {
-      if (!confirm('確定要移除這則排程？')) return;
-      const res = await fetch(`/api/posts/${id}`, { method: 'DELETE' });
-      if (res.ok) loadPosts();
-      else {
-        const err = await res.json();
-        alert(err.detail || '刪除失敗');
+      if (!confirm('確定要取消這則排程嗎？')) return;
+      try {
+        const res = await fetch(`/api/posts/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+          showToast('排程已成功刪除');
+          loadPosts();
+        } else {
+          const err = await res.json();
+          showToast(err.detail || '刪除失敗', 'error');
+        }
+      } catch (e) {
+        showToast('網路錯誤，請稍後再試', 'error');
       }
     }
 
@@ -163,10 +327,15 @@
       const message = document.getElementById('message').value.trim();
       const scheduled_time = document.getElementById('scheduled_time').value;
       const link = document.getElementById('link').value.trim() || null;
-      if (!message) {
-        msgErr.textContent = '請輸入貼文內容';
-        return;
-      }
+      
+      if (!message) { msgErr.textContent = '內容不能為空'; return; }
+
+      const btn = form.querySelector('button[type="submit"]');
+      const originalHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 spinner"></i> 處理中...`;
+      lucide.createIcons();
+
       try {
         const res = await fetch('/api/posts', {
           method: 'POST',
@@ -174,36 +343,36 @@
           body: JSON.stringify({ message, scheduled_time, link })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || '新增失敗');
+        if (!res.ok) throw new Error(data.detail || '系統忙碌中');
+        
+        showToast('排程建立成功！');
         form.reset();
         loadPosts();
       } catch (err) {
         msgErr.textContent = err.message;
+        showToast(err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        lucide.createIcons();
       }
     });
 
-    document.querySelectorAll('.filters button').forEach(btn => {
-      btn.addEventListener('click', () => setFilter(btn.dataset.filter));
-    });
-
-    setFilter('');
-
-    /* ── AI 產文 ── */
+    // --- AI Function ---
     let lastArticle = '';
-
     async function generateArticle() {
       const topic = document.getElementById('ai_topic').value.trim();
-      const errEl = document.getElementById('ai_err');
-      const previewEl = document.getElementById('ai_preview');
-      const actionsEl = document.getElementById('ai_actions');
+      if (!topic) { showToast('請先輸入主題', 'error'); return; }
+
       const btn = document.getElementById('ai_gen_btn');
-      errEl.textContent = '';
-      if (!topic) { errEl.textContent = '請輸入主題'; return; }
+      const resultContainer = document.getElementById('ai_result_container');
+      const previewEl = document.getElementById('ai_preview');
+      const errEl = document.getElementById('ai_err');
 
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span>生成中...';
-      previewEl.style.display = 'none';
-      actionsEl.style.display = 'none';
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 spinner"></i> 生成中...`;
+      lucide.createIcons();
+      errEl.textContent = '';
 
       try {
         const res = await fetch('/api/generate', {
@@ -212,16 +381,18 @@
           body: JSON.stringify({ topic })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || '生成失敗');
+        if (!res.ok) throw new Error(data.detail || 'AI 生成失敗');
+        
         lastArticle = data.article;
         previewEl.textContent = lastArticle;
-        previewEl.style.display = 'block';
-        actionsEl.style.display = 'flex';
+        resultContainer.style.display = 'block';
+        showToast('文章已生成');
       } catch (e) {
         errEl.textContent = e.message;
+        showToast(e.message, 'error');
       } finally {
         btn.disabled = false;
-        btn.textContent = '生成文章';
+        btn.textContent = '生成文章內容';
       }
     }
 
@@ -229,55 +400,73 @@
       if (!lastArticle) return;
       document.getElementById('message').value = lastArticle;
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      showToast('已填入編輯器');
     }
 
     function regenerate() {
       generateArticle();
     }
 
-    /* ── Token 管理 ── */
+    // --- Token Logic ---
     async function loadTokenStatus() {
-      const el = document.getElementById('token_status');
+      const container = document.getElementById('token_status_container');
+      const title = document.getElementById('token_status_title');
+      const desc = document.getElementById('token_status_desc');
+      const iconBox = document.getElementById('token_icon_box');
+      const icon = document.getElementById('token_icon');
+
       try {
         const res = await fetch('/api/token/status');
         const data = await res.json();
-        if (data.error) {
-          el.className = 'token-status token-unknown';
-          el.textContent = data.error;
-          return;
-        }
-        if (!data.has_token) {
-          el.className = 'token-status token-invalid';
-          el.textContent = '尚未設定 Token，請在下方貼上短期 Token 來更新。';
-          return;
-        }
-        if (data.is_valid) {
-          const expires = data.expires_at === 0 ? '永不過期' : new Date(data.expires_at * 1000).toLocaleString('zh-TW');
-          const src = data.source === 'database' ? '資料庫（永久 Token）' : '環境變數';
-          el.className = 'token-status token-valid';
-          el.innerHTML = `Token 有效 &nbsp;|&nbsp; 來源：${src} &nbsp;|&nbsp; 到期：${expires} &nbsp;|&nbsp; 類型：${data.type || '-'}`;
+        
+        if (data.error || !data.has_token) {
+          container.className = "rounded-xl p-4 flex items-start gap-3 bg-red-50 border border-red-100 transition-colors";
+          iconBox.className = "p-2 rounded-lg bg-red-100";
+          icon.setAttribute('data-lucide', 'shield-x');
+          title.className = "font-bold text-sm mb-0.5 text-red-700";
+          title.textContent = "Token 未設定或失效";
+          desc.textContent = "目前無法與 Facebook API 溝通，請貼上新的 Token。";
+        } else if (data.is_valid) {
+          container.className = "rounded-xl p-4 flex items-start gap-3 bg-green-50 border border-green-100 transition-colors";
+          iconBox.className = "p-2 rounded-lg bg-green-100";
+          icon.setAttribute('data-lucide', 'shield-check');
+          title.className = "font-bold text-sm mb-0.5 text-green-700";
+          title.textContent = "連線狀態良好 (已啟用)";
+          
+          const expires = data.expires_at === 0 ? '永久' : new Date(data.expires_at * 1000).toLocaleDateString();
+          desc.innerHTML = `類型：${data.type || 'Page'} &nbsp;|&nbsp; 到期：${expires}<br>來源：${data.source === 'database' ? '雲端資料庫' : '系統環境'}`;
+          
+          // 更新頂部全域狀態
+          globalStatus.innerHTML = `<div class="w-2 h-2 rounded-full bg-green-500"></div> 系統正常`;
+          globalStatus.className = "text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-50 text-green-700 font-medium";
         } else {
-          el.className = 'token-status token-invalid';
-          el.textContent = 'Token 已失效，請在下方更新。';
+          // 過期處理
+          container.className = "rounded-xl p-4 flex items-start gap-3 bg-amber-50 border border-amber-100 transition-colors";
+          iconBox.className = "p-2 rounded-lg bg-amber-100";
+          icon.setAttribute('data-lucide', 'clock');
+          title.className = "font-bold text-sm mb-0.5 text-amber-700";
+          title.textContent = "Token 效期已過";
+          desc.textContent = "請重新從 Facebook 取得短期金鑰進行更新。";
         }
+        lucide.createIcons();
       } catch (e) {
-        el.className = 'token-status token-unknown';
-        el.textContent = '無法載入 Token 狀態';
+        title.textContent = "連線異常";
+        desc.textContent = "無法載入 Token 狀態，請檢查網路。";
       }
     }
 
     async function renewToken() {
       const input = document.getElementById('token_input');
-      const errEl = document.getElementById('token_err');
-      const okEl = document.getElementById('token_ok');
       const btn = document.getElementById('token_renew_btn');
-      errEl.textContent = '';
-      okEl.textContent = '';
+      const msg = document.getElementById('token_msg');
       const short_token = input.value.trim();
-      if (!short_token) { errEl.textContent = '請貼上 Token'; return; }
+
+      if (!short_token) { showToast('請先貼上 Token', 'error'); return; }
 
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span>更新中...';
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 spinner"></i>`;
+      lucide.createIcons();
+
       try {
         const res = await fetch('/api/token/renew', {
           method: 'POST',
@@ -286,18 +475,29 @@
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || '更新失敗');
-        okEl.textContent = '永久 Page Token 更新成功！';
+        
+        showToast('永久 Token 更新成功！');
         input.value = '';
-        loadTokenStatus();
+        msg.className = "text-center text-xs text-green-600 font-bold mt-2";
+        msg.textContent = "更新成功！頁面將在 2 秒後重新整理...";
+        setTimeout(() => location.reload(), 2000);
       } catch (e) {
-        errEl.textContent = e.message;
+        showToast(e.message, 'error');
+        msg.className = "text-center text-xs text-red-500 mt-2";
+        msg.textContent = e.message;
       } finally {
         btn.disabled = false;
-        btn.textContent = '更新 Token';
+        btn.textContent = '更新';
       }
     }
 
+    // --- Init ---
+    loadPosts();
     loadTokenStatus();
+    setFilter('');
+    
+    // Auto refresh every 5 mins
+    setInterval(loadPosts, 300000);
   </script>
 </body>
 </html>
