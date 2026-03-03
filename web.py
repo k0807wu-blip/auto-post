@@ -56,10 +56,12 @@ def startup():
 # ── 排程 API ──────────────────────────────────────────────
 
 @app.get("/api/posts")
-def api_list_posts(status: str | None = None):
+def api_list_posts(status: str | None = None, month: str | None = None):
     if status and status not in ("pending", "sent", "failed"):
         raise HTTPException(status_code=400, detail="status 必須為 pending, sent 或 failed")
-    return list_posts(status_filter=status)
+    if month and not (len(month) == 7 and month[4] == "-" and month[:4].isdigit() and month[5:7].isdigit()):
+        raise HTTPException(status_code=400, detail="month 格式須為 YYYY-MM")
+    return list_posts(status_filter=status, month=month)
 
 
 @app.post("/api/posts")

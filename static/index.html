@@ -12,13 +12,30 @@
     .fb-blue { color: #1877F2; }
     .bg-fb-blue { background-color: #1877F2; }
     .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
-    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
-    .custom-scrollbar::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
+    .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    
+    .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); }
+    .day-cell { min-height: 100px; transition: all 0.2s ease; border: 0.5px solid #f1f5f9; }
+    .day-cell:hover { background-color: #f8fafc; }
+    .day-today { background-color: #eff6ff !important; border: 1px solid #bfdbfe !important; }
+    
+    .post-tooltip { 
+      visibility: hidden; opacity: 0; transform: translateY(10px); 
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .day-cell:hover .post-tooltip { 
+      visibility: visible; opacity: 1; transform: translateY(0); 
+    }
+    
     .btn-transition { transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
     .spinner { animation: spin 1s linear infinite; }
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     .status-badge { padding: 2px 8px; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; }
+    
+    @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+    .animate-in { animation: fadeIn 0.3s ease-out forwards; }
   </style>
 </head>
 <body class="text-slate-800 antialiased">
@@ -39,10 +56,10 @@
     </div>
   </nav>
 
-  <main class="max-w-6xl mx-auto p-4 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+  <main class="max-w-7xl mx-auto p-4 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
     
-    <!-- Left Column: Form & AI -->
-    <div class="lg:col-span-5 space-y-6">
+    <!-- Left Column: Form, AI, Token -->
+    <div class="lg:col-span-4 space-y-6">
       
       <!-- Create Post Card -->
       <section class="glass-card rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -60,20 +77,24 @@
               placeholder="想分享些什麼呢？"></textarea>
           </div>
           
-          <div class="grid grid-cols-2 gap-4">
+          <div class="space-y-4">
             <div>
-              <label class="block text-sm font-semibold text-slate-700 mb-1.5">排程時間</label>
+              <label class="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                <i data-lucide="calendar" class="w-4 h-4 text-slate-400"></i> 排程時間
+              </label>
               <input type="datetime-local" id="scheduled_time" name="scheduled_time" required
                 class="w-full rounded-xl border-slate-200 focus:ring-2 focus:ring-blue-500 text-sm p-2.5">
             </div>
             <div>
-              <label class="block text-sm font-semibold text-slate-700 mb-1.5">附加連結</label>
+              <label class="block text-sm font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                <i data-lucide="link" class="w-4 h-4 text-slate-400"></i> 附加連結
+              </label>
               <input type="url" id="link" name="link" placeholder="https://"
                 class="w-full rounded-xl border-slate-200 focus:ring-2 focus:ring-blue-500 text-sm p-2.5">
             </div>
           </div>
 
-          <button type="submit" class="w-full bg-fb-blue hover:bg-blue-600 text-white font-bold py-3 rounded-xl shadow-md shadow-blue-200 transition-all flex justify-center items-center gap-2 group">
+          <button type="submit" class="w-full bg-fb-blue hover:bg-blue-600 text-white font-bold py-3 rounded-xl shadow-md shadow-blue-200 transition-all flex justify-center items-center gap-2 group mt-2">
             <i data-lucide="send" class="w-4 h-4 group-hover:translate-x-1 transition-transform"></i>
             建立排程
           </button>
@@ -114,76 +135,72 @@
           <div class="text-red-500 text-xs mt-1" id="ai_err"></div>
         </div>
       </section>
-    </div>
-
-    <!-- Right Column: List & Token -->
-    <div class="lg:col-span-7 space-y-6">
       
-      <!-- List Card -->
-      <section class="glass-card rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[500px]">
-        <div class="p-5 border-b border-slate-100 bg-white flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div class="flex items-center gap-2">
-            <i data-lucide="list" class="w-5 h-5 fb-blue"></i>
-            <h2 class="font-semibold text-slate-800">排程列表</h2>
-          </div>
-          <div class="flex bg-slate-100 p-1 rounded-lg">
-            <button onclick="setFilter('')" data-filter="" class="filter-btn active px-3 py-1 text-xs font-semibold rounded-md transition-all">全部</button>
-            <button onclick="setFilter('pending')" data-filter="pending" class="filter-btn px-3 py-1 text-xs font-semibold rounded-md transition-all">待發送</button>
-            <button onclick="setFilter('sent')" data-filter="sent" class="filter-btn px-3 py-1 text-xs font-semibold rounded-md transition-all">已發送</button>
-            <button onclick="setFilter('failed')" data-filter="failed" class="filter-btn px-3 py-1 text-xs font-semibold rounded-md transition-all">失敗</button>
-          </div>
-        </div>
-
-        <div class="overflow-x-auto">
-          <table class="w-full text-left text-sm border-collapse">
-            <thead class="bg-slate-50/50 text-slate-500 font-medium">
-              <tr>
-                <th class="px-6 py-4 border-b border-slate-100">狀態</th>
-                <th class="px-6 py-4 border-b border-slate-100">內容預覽</th>
-                <th class="px-6 py-4 border-b border-slate-100">排程時間</th>
-                <th class="px-6 py-4 border-b border-slate-100 text-right">操作</th>
-              </tr>
-            </thead>
-            <tbody id="list" class="divide-y divide-slate-50">
-              <!-- JS Content -->
-            </tbody>
-          </table>
-        </div>
-      </section>
-
       <!-- Token Management Card -->
       <section class="glass-card rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <div class="p-5 border-b border-slate-100 flex items-center gap-2">
-          <i data-lucide="key" class="w-5 h-5 text-orange-500"></i>
-          <h2 class="font-semibold text-slate-800">Token 安全管理</h2>
+        <div class="p-4 border-b border-slate-100 flex items-center gap-2">
+          <i data-lucide="key" class="w-4 h-4 text-orange-500"></i>
+          <h2 class="font-semibold text-sm text-slate-800">Token 管理</h2>
         </div>
-        <div class="p-6 space-y-4">
-          <div id="token_status_container" class="rounded-xl p-4 flex items-start gap-3 transition-colors">
-            <div id="token_icon_box" class="p-2 rounded-lg bg-slate-100">
-               <i data-lucide="shield-alert" id="token_icon" class="w-5 h-5 text-slate-400"></i>
-            </div>
+        <div class="p-4 space-y-3">
+          <div id="token_status_container" class="rounded-xl p-3 flex items-start gap-2 bg-slate-50 border border-slate-100">
+            <i data-lucide="shield-alert" id="token_icon" class="w-4 h-4 text-slate-400 mt-0.5"></i>
             <div>
-              <p id="token_status_title" class="font-bold text-sm mb-0.5">狀態偵測中...</p>
-              <p id="token_status_desc" class="text-xs text-slate-500 leading-normal">請稍候，正在向 Facebook 驗證金鑰狀態</p>
+              <p id="token_status_title" class="font-bold text-xs">狀態偵測中...</p>
+              <p id="token_status_desc" class="text-[10px] text-slate-500">正在驗證 FB 金鑰</p>
             </div>
           </div>
-
-          <div class="bg-slate-50 rounded-xl p-4 border border-dashed border-slate-300">
-             <label class="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider">更新短期 Token</label>
-             <div class="flex gap-2">
-               <input type="text" id="token_input" placeholder="貼上從 Graph API Explorer 取得的 Token"
-                 class="flex-1 rounded-lg border-slate-200 text-xs p-2.5 focus:ring-2 focus:ring-orange-500">
-               <button id="token_renew_btn" onclick="renewToken()" 
-                 class="bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-black transition-all">
-                 更新
-               </button>
-             </div>
-             <p class="text-[10px] text-slate-400 mt-2 flex items-center gap-1">
-               <i data-lucide="info" class="w-3 h-3"></i>
-               此動作將自動為您向 FB 申請換發永久 Page Token
-             </p>
+          <div class="flex gap-2">
+             <input type="text" id="token_input" placeholder="更新短期 Token"
+               class="flex-1 rounded-lg border-slate-200 text-xs p-2 focus:ring-1 focus:ring-orange-500">
+             <button onclick="renewToken()" id="token_renew_btn" class="bg-slate-800 text-white px-3 py-2 rounded-lg text-xs font-bold">更新</button>
           </div>
-          <div id="token_msg" class="text-center text-xs"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Right Column: Calendar View -->
+    <div class="lg:col-span-8 space-y-6">
+      
+      <!-- Calendar Container -->
+      <section class="glass-card rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[600px] flex flex-col">
+        <div class="p-5 border-b border-slate-100 bg-white flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2">
+              <i data-lucide="calendar-days" class="w-6 h-6 fb-blue"></i>
+              <h2 id="current_month_display" class="font-bold text-lg text-slate-800">載入中…</h2>
+            </div>
+            <div class="flex bg-slate-100 p-1 rounded-lg">
+              <button type="button" onclick="changeMonth(-1)" class="p-1.5 hover:bg-white hover:shadow-sm rounded-md transition-all">
+                <i data-lucide="chevron-left" class="w-4 h-4 text-slate-600"></i>
+              </button>
+              <button type="button" onclick="resetToToday()" class="px-3 py-1 text-xs font-bold text-slate-600 hover:text-fb-blue transition-all">今天</button>
+              <button type="button" onclick="changeMonth(1)" class="p-1.5 hover:bg-white hover:shadow-sm rounded-md transition-all">
+                <i data-lucide="chevron-right" class="w-4 h-4 text-slate-600"></i>
+              </button>
+            </div>
+          </div>
+          <div class="flex gap-4 text-xs">
+             <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-amber-400"></div> 待發送</div>
+             <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-green-500"></div> 已發送</div>
+             <div class="flex items-center gap-1.5"><div class="w-2 h-2 rounded-full bg-red-500"></div> 失敗</div>
+          </div>
+        </div>
+
+        <!-- Week Headers -->
+        <div class="calendar-grid bg-slate-50 border-b border-slate-100">
+          <div class="py-2 text-center text-[10px] font-black uppercase text-slate-400">週日</div>
+          <div class="py-2 text-center text-[10px] font-black uppercase text-slate-400">週一</div>
+          <div class="py-2 text-center text-[10px] font-black uppercase text-slate-400">週二</div>
+          <div class="py-2 text-center text-[10px] font-black uppercase text-slate-400">週三</div>
+          <div class="py-2 text-center text-[10px] font-black uppercase text-slate-400">週四</div>
+          <div class="py-2 text-center text-[10px] font-black uppercase text-slate-400">週五</div>
+          <div class="py-2 text-center text-[10px] font-black uppercase text-slate-400">週六</div>
+        </div>
+
+        <!-- Calendar Days -->
+        <div id="calendar_body" class="calendar-grid flex-1">
+          <!-- JS Rendered -->
         </div>
       </section>
 
@@ -194,109 +211,123 @@
   <div id="toast_container" class="fixed bottom-6 right-6 z-[100] space-y-3 pointer-events-none"></div>
 
   <script>
-    // Initialize Lucide Icons
     lucide.createIcons();
 
     const form = document.getElementById('form');
-    const listEl = document.getElementById('list');
+    const calendarBody = document.getElementById('calendar_body');
+    const monthDisplay = document.getElementById('current_month_display');
     const msgErr = document.getElementById('msgErr');
     const globalStatus = document.getElementById('global_status');
-    let currentFilter = '';
 
-    // --- Toast Notification ---
-    function showToast(message, type = 'success') {
-      const container = document.getElementById('toast_container');
-      const toast = document.createElement('div');
-      toast.className = `flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl border pointer-events-auto transform translate-y-4 opacity-0 transition-all duration-300 bg-white ${type === 'success' ? 'border-green-100' : 'border-red-100'}`;
-      
-      const icon = type === 'success' ? 'check-circle' : 'alert-circle';
-      const color = type === 'success' ? 'text-green-500' : 'text-red-500';
-      
-      toast.innerHTML = `
-        <i data-lucide="${icon}" class="${color} w-5 h-5"></i>
-        <span class="text-sm font-medium text-slate-700">${message}</span>
-      `;
-      container.appendChild(toast);
-      lucide.createIcons();
+    let viewDate = new Date();
+    let allPosts = [];
 
-      setTimeout(() => {
-        toast.classList.remove('translate-y-4', 'opacity-0');
-      }, 10);
-
-      setTimeout(() => {
-        toast.classList.add('translate-y-4', 'opacity-0');
-        setTimeout(() => toast.remove(), 300);
-      }, 4000);
+    // --- Calendar: 依月份查詢並渲染 ---
+    async function loadPosts() {
+      try {
+        const year = viewDate.getFullYear();
+        const month = viewDate.getMonth() + 1;
+        const monthParam = `${year}-${String(month).padStart(2, '0')}`;
+        const res = await fetch(`/api/posts?month=${monthParam}`);
+        if (!res.ok) throw new Error('API 連線失敗');
+        allPosts = await res.json();
+        renderCalendar();
+      } catch (e) {
+        showToast('載入排程失敗', 'error');
+      }
     }
 
-    // --- List Logic ---
-    function setFilter(filter) {
-      currentFilter = filter;
-      document.querySelectorAll('.filter-btn').forEach(btn => {
-        if (btn.dataset.filter === filter) {
-          btn.classList.add('active', 'bg-white', 'shadow-sm', 'text-fb-blue');
-          btn.classList.remove('text-slate-500');
-        } else {
-          btn.classList.remove('active', 'bg-white', 'shadow-sm', 'text-fb-blue');
-          btn.classList.add('text-slate-500');
+    function renderCalendar() {
+      const year = viewDate.getFullYear();
+      const month = viewDate.getMonth();
+      monthDisplay.textContent = `${year}年 ${month + 1}月`;
+
+      const firstDay = new Date(year, month, 1).getDay();
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const today = new Date();
+
+      calendarBody.innerHTML = '';
+
+      for (let i = 0; i < firstDay; i++) {
+        calendarBody.appendChild(createDayCell(null));
+      }
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const dayPosts = allPosts.filter(p => p.scheduled_time && p.scheduled_time.startsWith(dateStr));
+        const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
+        calendarBody.appendChild(createDayCell(day, dayPosts, isToday));
+      }
+
+      lucide.createIcons();
+    }
+
+    function createDayCell(dayNum, posts = [], isToday = false) {
+      const cell = document.createElement('div');
+      cell.className = `day-cell p-2 relative group ${dayNum === null ? 'bg-slate-50/50' : 'bg-white'}`;
+      if (isToday) cell.classList.add('day-today');
+
+      if (dayNum !== null) {
+        let postsHtml = '';
+        if (posts.length > 0) {
+          const dots = posts.map(p => {
+            const color = p.status === 'sent' ? 'bg-green-500' : p.status === 'failed' ? 'bg-red-500' : 'bg-amber-400';
+            return `<div class="w-1.5 h-1.5 rounded-full ${color}"></div>`;
+          }).join('');
+
+          const postListHtml = posts.map(p => {
+            const statusIcon = p.status === 'sent' ? 'check-circle' : p.status === 'failed' ? 'x-circle' : 'clock';
+            const statusColor = p.status === 'sent' ? 'text-green-500' : p.status === 'failed' ? 'text-red-500' : 'text-amber-500';
+            const timeStr = (p.scheduled_time || '').split('T')[1] ? (p.scheduled_time || '').split('T')[1].slice(0, 5) : '--:--';
+            const safeId = String(p.id).replace(/'/g, "\\'");
+            return `
+              <div class="flex items-start gap-2 p-2 border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
+                <i data-lucide="${statusIcon}" class="w-3 h-3 ${statusColor} mt-1 shrink-0"></i>
+                <div class="min-w-0 flex-1">
+                  <div class="text-[10px] font-bold text-slate-400">${timeStr}</div>
+                  <div class="text-xs text-slate-600 truncate">${escapeHtml((p.message || ''))}</div>
+                </div>
+                ${p.status === 'pending' ? `<button type="button" onclick="event.stopPropagation(); removePost('${safeId}');" class="text-slate-300 hover:text-red-500"><i data-lucide="trash-2" class="w-3 h-3"></i></button>` : ''}
+              </div>
+            `;
+          }).join('');
+
+          postsHtml = `
+            <div class="flex flex-wrap gap-1 mt-1 mb-2">${dots}</div>
+            <div class="post-tooltip absolute z-[60] left-1/2 -translate-x-1/2 top-full mt-1 w-48 bg-white shadow-2xl rounded-xl border border-slate-100 overflow-hidden pointer-events-auto">
+               <div class="bg-slate-50 px-3 py-1.5 text-[10px] font-bold text-slate-400 border-b border-slate-100">當日排程 (${posts.length})</div>
+               <div class="max-h-48 overflow-y-auto custom-scrollbar">${postListHtml}</div>
+            </div>
+          `;
         }
-      });
+
+        cell.innerHTML = `
+          <span class="text-xs font-bold ${isToday ? 'fb-blue' : 'text-slate-400'}">${dayNum}</span>
+          ${postsHtml}
+        `;
+      }
+      return cell;
+    }
+
+    function changeMonth(delta) {
+      viewDate.setMonth(viewDate.getMonth() + delta);
       loadPosts();
     }
 
-    async function loadPosts() {
-      try {
-        const url = currentFilter ? `/api/posts?status=${currentFilter}` : '/api/posts';
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('無法連線至 API');
-        
-        const posts = await res.json();
-        if (posts.length === 0) {
-          listEl.innerHTML = `<tr><td colspan="4" class="px-6 py-12 text-center text-slate-400">
-            <i data-lucide="inbox" class="w-8 h-8 mx-auto mb-2 opacity-20"></i>
-            沒有找到任何排程
-          </td></tr>`;
-          lucide.createIcons();
-          return;
-        }
+    function resetToToday() {
+      viewDate = new Date();
+      loadPosts();
+    }
 
-        listEl.innerHTML = posts.map(p => {
-          const time = (p.scheduled_time || '').replace('T', ' ').slice(0, 16);
-          const statusMap = {
-            pending: { label: '待發送', class: 'bg-amber-100 text-amber-700' },
-            sent: { label: '已發送', class: 'bg-green-100 text-green-700' },
-            failed: { label: '發送失敗', class: 'bg-red-100 text-red-700' }
-          };
-          const status = statusMap[p.status] || { label: p.status, class: 'bg-slate-100 text-slate-700' };
-          const msgPreview = (p.message || '').length > 50 ? p.message.slice(0, 50) + '...' : p.message;
-          
-          return `
-            <tr class="hover:bg-slate-50/50 transition-colors group">
-              <td class="px-6 py-4">
-                <span class="status-badge ${status.class}">${status.label}</span>
-              </td>
-              <td class="px-6 py-4">
-                <div class="max-w-[250px] overflow-hidden text-ellipsis whitespace-nowrap text-slate-600" title="${escapeHtml((p.message || ''))}">
-                  ${escapeHtml(msgPreview)}
-                </div>
-              </td>
-              <td class="px-6 py-4 text-xs font-medium text-slate-500">
-                ${time}
-              </td>
-              <td class="px-6 py-4 text-right">
-                ${p.status === 'pending' ? `
-                  <button onclick="removePost('${String(p.id).replace(/'/g, "\\'")}')" class="p-2 text-slate-300 hover:text-red-500 transition-colors">
-                    <i data-lucide="trash-2" class="w-4 h-4"></i>
-                  </button>
-                ` : `<i data-lucide="check" class="w-4 h-4 text-green-400 inline-block mr-2"></i>`}
-              </td>
-            </tr>
-          `;
-        }).join('');
-        lucide.createIcons();
-      } catch (e) {
-        console.error(e);
-      }
+    // --- Toast ---
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast_container');
+      const toast = document.createElement('div');
+      toast.className = `flex items-center gap-3 px-4 py-3 rounded-xl shadow-xl border pointer-events-auto transform transition-all duration-300 bg-white ${type === 'success' ? 'border-green-100' : 'border-red-100'} animate-in`;
+      toast.innerHTML = `<i data-lucide="${type === 'success' ? 'check-circle' : 'alert-circle'}" class="${type === 'success' ? 'text-green-500' : 'text-red-500'} w-5 h-5"></i><span class="text-sm font-medium text-slate-700">${message}</span>`;
+      container.appendChild(toast);
+      lucide.createIcons();
+      setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 4000);
     }
 
     function escapeHtml(s) {
@@ -305,12 +336,13 @@
       return div.innerHTML;
     }
 
+    // --- API: 刪除排程 ---
     async function removePost(id) {
       if (!confirm('確定要取消這則排程嗎？')) return;
       try {
         const res = await fetch(`/api/posts/${id}`, { method: 'DELETE' });
         if (res.ok) {
-          showToast('排程已成功刪除');
+          showToast('已取消排程');
           loadPosts();
         } else {
           const err = await res.json();
@@ -321,13 +353,13 @@
       }
     }
 
+    // --- 表單送出 ---
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       msgErr.textContent = '';
       const message = document.getElementById('message').value.trim();
       const scheduled_time = document.getElementById('scheduled_time').value;
       const link = document.getElementById('link').value.trim() || null;
-      
       if (!message) { msgErr.textContent = '內容不能為空'; return; }
 
       const btn = form.querySelector('button[type="submit"]');
@@ -344,7 +376,6 @@
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || '系統忙碌中');
-        
         showToast('排程建立成功！');
         form.reset();
         loadPosts();
@@ -358,7 +389,7 @@
       }
     });
 
-    // --- AI Function ---
+    // --- AI 撰稿 ---
     let lastArticle = '';
     async function generateArticle() {
       const topic = document.getElementById('ai_topic').value.trim();
@@ -382,7 +413,6 @@
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'AI 生成失敗');
-        
         lastArticle = data.article;
         previewEl.textContent = lastArticle;
         resultContainer.style.display = 'block';
@@ -393,6 +423,7 @@
       } finally {
         btn.disabled = false;
         btn.textContent = '生成文章內容';
+        lucide.createIcons();
       }
     }
 
@@ -407,96 +438,78 @@
       generateArticle();
     }
 
-    // --- Token Logic ---
+    // --- Token ---
     async function loadTokenStatus() {
       const container = document.getElementById('token_status_container');
       const title = document.getElementById('token_status_title');
       const desc = document.getElementById('token_status_desc');
-      const iconBox = document.getElementById('token_icon_box');
       const icon = document.getElementById('token_icon');
 
       try {
         const res = await fetch('/api/token/status');
         const data = await res.json();
-        
         if (data.error || !data.has_token) {
-          container.className = "rounded-xl p-4 flex items-start gap-3 bg-red-50 border border-red-100 transition-colors";
-          iconBox.className = "p-2 rounded-lg bg-red-100";
-          icon.setAttribute('data-lucide', 'shield-x');
-          title.className = "font-bold text-sm mb-0.5 text-red-700";
+          container.className = "rounded-xl p-3 flex items-start gap-2 bg-red-50 border border-red-100";
+          title.className = "font-bold text-xs text-red-700";
           title.textContent = "Token 未設定或失效";
-          desc.textContent = "目前無法與 Facebook API 溝通，請貼上新的 Token。";
+          desc.textContent = "請貼上新的 Token 更新";
+          icon.setAttribute('data-lucide', 'shield-x');
+          icon.className = "w-4 h-4 text-red-500 mt-0.5";
         } else if (data.is_valid) {
-          container.className = "rounded-xl p-4 flex items-start gap-3 bg-green-50 border border-green-100 transition-colors";
-          iconBox.className = "p-2 rounded-lg bg-green-100";
-          icon.setAttribute('data-lucide', 'shield-check');
-          title.className = "font-bold text-sm mb-0.5 text-green-700";
-          title.textContent = "連線狀態良好 (已啟用)";
-          
+          container.className = "rounded-xl p-3 flex items-start gap-2 bg-green-50 border border-green-100";
+          title.className = "font-bold text-xs text-green-700";
+          title.textContent = "連線狀態良好";
           const expires = data.expires_at === 0 ? '永久' : new Date(data.expires_at * 1000).toLocaleDateString();
-          desc.innerHTML = `類型：${data.type || 'Page'} &nbsp;|&nbsp; 到期：${expires}<br>來源：${data.source === 'database' ? '雲端資料庫' : '系統環境'}`;
-          
-          // 更新頂部全域狀態
+          desc.textContent = `到期：${expires}`;
+          icon.setAttribute('data-lucide', 'shield-check');
+          icon.className = "w-4 h-4 text-green-500 mt-0.5";
           globalStatus.innerHTML = `<div class="w-2 h-2 rounded-full bg-green-500"></div> 系統正常`;
           globalStatus.className = "text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-50 text-green-700 font-medium";
         } else {
-          // 過期處理
-          container.className = "rounded-xl p-4 flex items-start gap-3 bg-amber-50 border border-amber-100 transition-colors";
-          iconBox.className = "p-2 rounded-lg bg-amber-100";
-          icon.setAttribute('data-lucide', 'clock');
-          title.className = "font-bold text-sm mb-0.5 text-amber-700";
+          container.className = "rounded-xl p-3 flex items-start gap-2 bg-amber-50 border border-amber-100";
+          title.className = "font-bold text-xs text-amber-700";
           title.textContent = "Token 效期已過";
-          desc.textContent = "請重新從 Facebook 取得短期金鑰進行更新。";
+          desc.textContent = "請重新取得短期金鑰並更新";
+          icon.setAttribute('data-lucide', 'clock');
+          icon.className = "w-4 h-4 text-amber-500 mt-0.5";
         }
         lucide.createIcons();
       } catch (e) {
         title.textContent = "連線異常";
-        desc.textContent = "無法載入 Token 狀態，請檢查網路。";
+        desc.textContent = "無法載入 Token 狀態";
       }
     }
 
     async function renewToken() {
-      const input = document.getElementById('token_input');
+      const token = document.getElementById('token_input').value.trim();
+      if (!token) { showToast('請先貼上 Token', 'error'); return; }
       const btn = document.getElementById('token_renew_btn');
-      const msg = document.getElementById('token_msg');
-      const short_token = input.value.trim();
-
-      if (!short_token) { showToast('請先貼上 Token', 'error'); return; }
-
       btn.disabled = true;
       btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 spinner"></i>`;
       lucide.createIcons();
-
       try {
         const res = await fetch('/api/token/renew', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ short_token })
+          body: JSON.stringify({ short_token: token })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || '更新失敗');
-        
-        showToast('永久 Token 更新成功！');
-        input.value = '';
-        msg.className = "text-center text-xs text-green-600 font-bold mt-2";
-        msg.textContent = "更新成功！頁面將在 2 秒後重新整理...";
-        setTimeout(() => location.reload(), 2000);
+        showToast('Token 更新成功');
+        document.getElementById('token_input').value = '';
+        setTimeout(() => location.reload(), 1500);
       } catch (e) {
-        showToast(e.message, 'error');
-        msg.className = "text-center text-xs text-red-500 mt-2";
-        msg.textContent = e.message;
+        showToast(e.message || '更新失敗', 'error');
       } finally {
         btn.disabled = false;
         btn.textContent = '更新';
+        lucide.createIcons();
       }
     }
 
     // --- Init ---
     loadPosts();
     loadTokenStatus();
-    setFilter('');
-    
-    // Auto refresh every 5 mins
     setInterval(loadPosts, 300000);
   </script>
 </body>

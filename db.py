@@ -102,18 +102,36 @@ def add_post(message: str, scheduled_time_str: str) -> dict:
     }
 
 
-def list_posts(status_filter: str = None) -> list:
-    """列出排程貼文，可依狀態篩選，按排程時間排序。"""
+def list_posts(status_filter: str = None, month: str = None) -> list:
+    """列出排程貼文，可依狀態、月份篩選，按排程時間排序。
+
+    month: 選填，格式 YYYY-MM，只回傳該月份的排程。
+    """
     conn = _get_conn()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            conditions = []
+            args = []
             if status_filter:
-                cur.execute(
-                    "SELECT * FROM posts WHERE status = %s ORDER BY scheduled_time",
-                    (status_filter,),
-                )
-            else:
-                cur.execute("SELECT * FROM posts ORDER BY scheduled_time")
+                conditions.append("status = %s")
+                args.append(status_filter)
+            if month:
+                try:
+                    year, m = map(int, month.split("-"))
+                    start = datetime(year, m, 1)
+                    if m == 12:
+                        end = datetime(year + 1, 1, 1)
+                    else:
+                        end = datetime(year, m + 1, 1)
+                    conditions.append("scheduled_time >= %s AND scheduled_time < %s")
+                    args.extend([start, end])
+                except (ValueError, TypeError):
+                    pass
+            where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
+            cur.execute(
+                f"SELECT * FROM posts{where} ORDER BY scheduled_time",
+                tuple(args) if args else (),
+            )
             rows = cur.fetchall()
     finally:
         conn.close()
